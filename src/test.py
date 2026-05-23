@@ -1,5 +1,5 @@
 from SlidingWindowBinarizer import SlidingWindowBinarizer
-from new.Get8Dir import Stroke8DirVectorAdjust
+from src.Get8Dir import Stroke8DirVectorAdjust
 import openpyxl  # 用于操作Excel
 
 def find_and_visualize(image_path, excel_save_path="binary_image_data.xlsx"):

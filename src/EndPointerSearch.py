@@ -5,7 +5,7 @@ import time
 
 # 导入你的二值化类和8方向计算类
 from SlidingWindowBinarizer import SlidingWindowBinarizer
-from new.Get8Dir import Stroke8DirVectorAdjust
+from src.Get8Dir import Stroke8DirVectorAdjust
 
 
 class StrokeEndpointDetector:

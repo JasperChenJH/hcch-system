@@ -6,7 +6,7 @@ import matplotlib
 
 # 导入你的二值化类和8方向计算类
 from SlidingWindowBinarizer import SlidingWindowBinarizer
-from new.Get8Dir import Stroke8DirVectorAdjust
+from src.Get8Dir import Stroke8DirVectorAdjust
 matplotlib.use('TkAgg')  # 强制切换后端，解决报错
 
 class StrokeEndpointDetector:
