@@ -2,11 +2,12 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import matplotlib
 
 # 导入你的二值化类和8方向计算类
 from SlidingWindowBinarizer import SlidingWindowBinarizer
 from src.Get8Dir import Stroke8DirVectorAdjust
-
+matplotlib.use('TkAgg')  # 强制切换后端，解决报错
 
 class StrokeEndpointDetector:
     def __init__(self, long_threshold=20.0, var_threshold=2.0, abs_threshold = 0.5):
@@ -29,10 +30,11 @@ class StrokeEndpointDetector:
     def is_endpoint(self, dir_list):
         """
         根据自定义规则判定是否为端点：
-        1. 有一距离很长
-        2. 其他距离长度的方差很小
-        3. 这一最长距离是其他距离的平均的两倍及以上
+        1. 有一最长距离是其对应距离（dir_list中相对位置-4或+4）的2倍以上
+        2. 对应距离左右两侧距离的长度差很小（+ — 1），且大于对应距离（如果对应距离为0，则进行拉普拉斯校准）
+        3. 对应距离左右两侧距离小于对应距离2倍
         4. 剩下七个值和平均值之间的差的绝对值都要小于某一阈值 (新增严格限制)
+        5. 与最长距离相对的距离应大于某阈值，且？}
         :param dir_list: 包含8个方向长度的列表
         :return: bool, 是否为端点
         """
@@ -42,33 +44,38 @@ class StrokeEndpointDetector:
 
         # 找到最长距离
         max_len = max(dir_list)
+        max_idx = dir_list.index(max_len)
+        min_len = min(dir_list)
 
         # 满足“有一距离很长”
-        if max_len < self.long_threshold:
-            return False
+        # if max_len < self.long_threshold:
+        #    return False
 
-        # 提取剩下的 7 个距离 (对列表排序后去掉最后一个最大值)
+        ## 提取剩下的 7 个距离 (对列表排序后去掉最后一个最大值)
+        # sorted_list = sorted(dir_list)
+        # remaining_7 = sorted_list[:-1]
+
+        # 提取最长距离（margin，边距）对应的边距及其两侧的边距 ***
         sorted_list = sorted(dir_list)
-        remaining_7 = sorted_list[:-1]
+        len_l_1 = dir_list[(max_idx - 1) % 8]
+        len_l_2 = dir_list[(max_idx - 2) % 8]
+        len_l_3 = dir_list[(max_idx - 3) % 8]
+        opposite_len = dir_list[(max_idx + 4) % 8]
+        len_r_1 = dir_list[(max_idx + 1) % 8]
+        len_r_2 = dir_list[(max_idx + 2) % 8]
+        len_r_3 = dir_list[(max_idx + 3) % 8]
 
-        # 计算剩下 7 个距离的方差和平均值
-        variance = np.var(remaining_7)
-        mean_val = np.mean(remaining_7)
-        # 计算最长距离
-        max_val = np.max(remaining_7)
-        min_val = np.min(remaining_7)
-        # 【优化你新增的条件】：使用 all() 替代全局变量 flag 和 for 循环
-        # 最长点的对应点和对应点的左右两个点的长度形成一个列表
-        opposite_three = get_opposite_and_neighbors(dir_list)
-        opposite_three_mean = np.mean(opposite_three)
-        opposite_three_max = np.max(opposite_three)
-        # 意思是：剩下的7个值中，是否"所有"的值都满足 abs(x - mean_val) <= self.var_threshold
-        # is_dev_small = all(abs(x - mean_val) <= self.abs_threshold for x in remaining_7)
-        is_dev_small = all(abs(x - opposite_three_mean) <= self.abs_threshold for x in opposite_three)
+        print(dir_list, max_idx)
 
-        # 条件判定：方差很小 且 最长距离 >= 其他距离平均值的 2 倍 且 满足绝对差限制
-        # flag = variance <= self.var_threshold
-        if  max_len >= (2 * opposite_three_max) and is_dev_small and opposite_three[1]>=3 and opposite_three[1]<=5:
+        # 对应边距与两侧边距的差较小，大于0，小于等于2 ***
+        margin_equal = all(abs(a - b) <= 2 for a, b in [
+            (len_l_1, len_r_1),
+            (len_l_2, len_r_2),
+            (len_l_3, len_r_3)
+        ])
+
+        # 条件判定：最长距离 >= 对应距离的 2 倍，
+        if max_len >= (2 * opposite_len) and margin_equal and opposite_len <= 5:  # ***
             print(dir_list)
             return True
 
@@ -101,10 +108,9 @@ class StrokeEndpointDetector:
 
                 # 获取该点的8方向长度
                 dir_list = self.adjust.get_8dir_lengths(i, j, binary_img)
-                rounded_list = [round(v, 2) for v in dir_list]
-                print("非255点坐标:", i, j, "像素值:", binary_img[j, i], "8方向:", rounded_list)
+
                 # 进行端点判定
-                if self.is_endpoint(rounded_list):
+                if self.is_endpoint(dir_list):
                     # print(dir_list) # 若嫌输出太多可注释掉
                     endpoints_x.append(i)
                     endpoints_y.append(j)
@@ -153,33 +159,13 @@ class StrokeEndpointDetector:
         plt.tight_layout()
         plt.show()
 
-def get_opposite_and_neighbors(dir_list):
-    """
-    找到最长方向的对应方向，以及对应方向左右两个方向的长度
-    :param dir_list: 8个方向长度列表
-    :return: [左邻方向长度, 对应方向长度, 右邻方向长度]
-    """
-    max_idx = np.argmax(dir_list)
-
-    # 最长方向的对应方向，也就是相反方向
-    opposite_idx = (max_idx + 4) % 8
-
-    # 对应方向的左右两个方向
-    left_idx = (opposite_idx - 1) % 8
-    right_idx = (opposite_idx + 1) % 8
-
-    return [
-        dir_list[left_idx],
-        dir_list[opposite_idx],
-        dir_list[right_idx]
-    ]
 
 if __name__ == '__main__':
     # 运行测试
-    image_path = "./白.png"  # 替换为你的图片路径
+    image_path = "./汉字图片/鼎.png"  # 替换为你的图片路径
 
     # 实例化端点检测器，参数可以根据图片的实际分辨率调整
     # long_threshold: 要求最长距离至少达到这个像素值
     # var_threshold: 剩余7个距离的方差上限，越小要求越严苛（越均匀）
-    detector = StrokeEndpointDetector(long_threshold=0, var_threshold=14,abs_threshold = 3)
+    detector = StrokeEndpointDetector(long_threshold=0, var_threshold=14,abs_threshold = 5)
     detector.detect_and_visualize(image_path)

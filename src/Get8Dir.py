@@ -118,6 +118,79 @@ class Stroke8DirVectorAdjust:
 
         return V
 
+    def _angle_between_vectors(self, v1, v2):
+        """
+        计算两个方向向量之间的夹角，单位：度
+        v1, v2 格式：(dx, dy, L)
+        如果某个方向长度为 0，返回 None
+        """
+        dx1, dy1, len1 = v1
+        dx2, dy2, len2 = v2
+
+        # 有一个方向长度为 0，无法计算夹角
+        if len1 == 0 or len2 == 0:
+            return None
+
+        # 点积公式：cos(theta) = (a·b) / (|a| |b|)
+        dot = dx1 * dx2 + dy1 * dy2
+        cos_theta = dot / (len1 * len2)
+
+        # 防止浮点误差导致 acos 报错
+        cos_theta = max(-1.0, min(1.0, cos_theta))
+
+        angle = math.degrees(math.acos(cos_theta))
+        return angle
+
+    def get_8dir_angle_matrix(self, px: int, py: int, binary_img: np.ndarray):
+        """
+        获取 8 个方向两两之间的夹角矩阵。
+
+        返回：
+        8x8 矩阵 angle_matrix
+        angle_matrix[i][j] 表示 Di 和 Dj 的夹角，单位：度
+        如果某个方向长度为 0，则对应位置为 None
+        """
+        adjusted_vecs = self.adjust_vectors(px, py, binary_img)
+
+        angle_matrix = [[None for _ in range(8)] for _ in range(8)]
+
+        for i in range(8):
+            for j in range(8):
+                if i == j:
+                    angle_matrix[i][j] = 0.0
+                else:
+                    angle_matrix[i][j] = self._angle_between_vectors(
+                        adjusted_vecs[i],
+                        adjusted_vecs[j]
+                    )
+
+        return angle_matrix
+
+    def get_8dir_pair_angles(self, px: int, py: int, binary_img: np.ndarray):
+        """
+        获取 8 个方向两两之间的夹角，只返回不重复的组合。
+
+        返回：
+        {
+            (0, 1): 45.0,
+            (0, 2): 90.0,
+            ...
+        }
+        """
+        adjusted_vecs = self.adjust_vectors(px, py, binary_img)
+
+        pair_angles = {}
+
+        for i in range(8):
+            for j in range(i + 1, 8):
+                angle = self._angle_between_vectors(
+                    adjusted_vecs[i],
+                    adjusted_vecs[j]
+                )
+                pair_angles[(i, j)] = angle
+
+        return pair_angles
+
     def get_8dir_lengths(self, px: int, py: int, binary_img: np.ndarray):
         """
         返回调整后的 8 个方向长度。
