@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Model files
+*.pth
+*.pt
+*.h5
+*.onnx
+*.pkl
+
+# Dataset
+data/
+dataset/
+datasets/
+
+# Logs
+logs/
+runs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# System
+.DS_Store
+Thumbs.db
+
+# Build / cache
+dist/
+build/
+target/
+test/
